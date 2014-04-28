@@ -85,6 +85,11 @@ public class MapDBCache<V extends Serializable> implements Cache<String, V> {
     return cache.values();
   }
 
+  @Override
+  public boolean containsKey(String key) {
+    return cache.containsKey(key);
+  }
+
   public <V extends Serializable> ConcurrentNavigableMap<String, V> createStringCache(String cacheName) {
     return createCache(cacheName, BTreeKeySerializer.STRING);
   }

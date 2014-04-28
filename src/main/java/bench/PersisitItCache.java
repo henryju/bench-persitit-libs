@@ -168,7 +168,8 @@ public class PersisitItCache<K, V extends Serializable> implements Cache<K, V> {
     }
   }
 
-  public boolean containsKey(Object key) {
+  @Override
+  public boolean containsKey(K key) {
     resetKey(key);
     return doContainsKey();
   }

@@ -3,7 +3,7 @@ package bench;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.core.KeywordAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -13,12 +13,13 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.MultiFields;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.SimpleFSDirectory;
 import org.apache.lucene.util.Bits;
@@ -37,24 +38,28 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
   private Kryo kryo;
   private DirectoryReader reader;
   private Class<V> valueClass;
-  private StandardAnalyzer analyzer;
+  private KeywordAnalyzer analyzer;
   private IndexSearcher searcher;
 
-  public LuceneCache(Class<V> valueClass) throws IOException {
-    this.valueClass = valueClass;
-    analyzer = new StandardAnalyzer(Version.LUCENE_47);
-    Directory index = new SimpleFSDirectory(new File("target/lucene"));
+  public LuceneCache(Class<V> valueClass) {
+    try {
+      this.valueClass = valueClass;
+      analyzer = new KeywordAnalyzer();
+      Directory index = new SimpleFSDirectory(new File("target/lucene"));
 
-    IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_47, analyzer);
-    config.setOpenMode(OpenMode.CREATE);
+      IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_47, analyzer);
+      config.setOpenMode(OpenMode.CREATE);
 
-    kryo = new Kryo();
-    kryo.setInstantiatorStrategy(new SerializingInstantiatorStrategy());
+      kryo = new Kryo();
+      kryo.setInstantiatorStrategy(new SerializingInstantiatorStrategy());
 
-    writer = new IndexWriter(index, config);
+      writer = new IndexWriter(index, config);
 
-    reader = DirectoryReader.open(writer, true);
-    searcher = new IndexSearcher(reader);
+      reader = DirectoryReader.open(writer, true);
+      searcher = new IndexSearcher(reader);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -68,18 +73,45 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
   }
 
   @Override
+  public boolean containsKey(String key) {
+    reopenReader();
+    try {
+      TopDocs topDocs = search(key);
+      return topDocs.totalHits > 0;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private TopDocs search(String key) throws IOException {
+    BooleanQuery q = new BooleanQuery();
+    q.add(new BooleanClause(new TermQuery(new Term("key", key)), Occur.MUST));
+    TopDocs topDocs = searcher.search(q, 1);
+    return topDocs;
+  }
+
+  @Override
   public LuceneCache<V> put(String key, V value) {
+    try {
+      writer.deleteDocuments(new Term("key", key));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    doPut(key, value);
+    return this;
+  }
+
+  private void doPut(String key, V value) {
     ByteArrayOutputStream serData = new ByteArrayOutputStream();
     serialize(value, serData);
     Document doc = new Document();
-    doc.add(new TextField("key", key, Field.Store.YES));
+    doc.add(new TextField("key", key, Field.Store.NO));
     doc.add(new StoredField("data", serData.toByteArray()));
     try {
       writer.addDocument(doc);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return this;
   }
 
   @Override
@@ -92,6 +124,7 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
     try {
       DirectoryReader newReader = DirectoryReader.openIfChanged(reader, writer, true);
       if (newReader != null) {
+        reader.close();
         reader = newReader;
         searcher = new IndexSearcher(reader);
       }
@@ -161,16 +194,11 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
   public V get(String key) {
     reopenReader();
     try {
-      Query q = new QueryParser(Version.LUCENE_47, "key", analyzer).parse("key:" + key);
-      int hitsPerPage = 1;
-      TopScoreDocCollector collector = TopScoreDocCollector.create(hitsPerPage, true);
-      searcher.search(q, collector);
-      TopDocs topDocs = collector.topDocs();
+      TopDocs topDocs = search(key);
       if (topDocs.totalHits == 0) {
         return null;
       }
-      ScoreDoc[] hits = topDocs.scoreDocs;
-      Document doc = searcher.doc(hits[0].doc);
+      Document doc = searcher.doc(topDocs.scoreDocs[0].doc);
       byte[] serData = doc.getBinaryValue("data").bytes;
       return deserialize(serData);
     } catch (Exception e) {
