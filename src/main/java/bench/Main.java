@@ -7,15 +7,17 @@ import java.util.List;
 
 public class Main {
 
-  private static final int DATA_SIZE = 100;
+  private static final int DATA_SIZE = 1000;
   private static final long COUNT = 1_000_000;
+  private static final long RANDOM_SELECT_COUNT = 100_000;
   private static final long RANDOM_UPDATE_COUNT = 10_000;
-  private static List<Integer> toBeUpdate;
+  private static List<Integer> toBeUpdated;
+  private static List<Integer> toBeSelected;
   private static String bigData;
 
   public static void main(String[] args) {
     generateData();
-
+    generateIdToSelect();
     generateIdToUpdate();
 
     System.out.println("------- PERSISIT 1 -----------");
@@ -38,9 +40,16 @@ public class Main {
   }
 
   private static void generateIdToUpdate() {
-    toBeUpdate = new ArrayList<>();
+    toBeUpdated = new ArrayList<>();
     for (int i = 0; i < RANDOM_UPDATE_COUNT; i++) {
-      toBeUpdate.add((int) (Math.random() * COUNT));
+      toBeUpdated.add((int) (Math.random() * COUNT));
+    }
+  }
+
+  private static void generateIdToSelect() {
+    toBeSelected = new ArrayList<>();
+    for (int i = 0; i < RANDOM_SELECT_COUNT; i++) {
+      toBeSelected.add((int) (Math.random() * COUNT));
     }
   }
 
@@ -79,8 +88,18 @@ public class Main {
     System.out.println("Access all by key: " + (System.currentTimeMillis() - start) + "ms");
 
     start = System.currentTimeMillis();
+    for (int i = 0; i < RANDOM_SELECT_COUNT; i++) {
+      Integer id = toBeSelected.get(i);
+      Measure m = cache.get("key" + id);
+      if (!m.getData().equals(bigData) || !m.getKey().equals("key" + id)) {
+        throw new RuntimeException();
+      }
+    }
+    System.out.println(RANDOM_SELECT_COUNT + " random selects: " + (System.currentTimeMillis() - start) + "ms");
+
+    start = System.currentTimeMillis();
     for (int i = 0; i < RANDOM_UPDATE_COUNT; i++) {
-      Integer id = toBeUpdate.get(i);
+      Integer id = toBeUpdated.get(i);
       Measure m = cache.get("key" + id);
       if (!m.getData().equals(bigData) || !m.getKey().equals("key" + id)) {
         throw new RuntimeException();

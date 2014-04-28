@@ -25,7 +25,9 @@ import com.persistit.Key;
 import com.persistit.Persistit;
 import com.persistit.Volume;
 import com.persistit.exception.PersistitException;
+import com.persistit.logging.Slf4jAdapter;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.Serializable;
@@ -54,6 +56,7 @@ public class PersisitItCache<K, V extends Serializable> implements Cache<K, V> {
       FileUtils.deleteQuietly(tempDir);
       tempDir.mkdirs();
       persistit = new Persistit();
+      persistit.setPersistitLogger(new Slf4jAdapter(LoggerFactory.getLogger("PERSISTIT")));
       Properties props = new Properties();
       props.setProperty("datapath", tempDir.getAbsolutePath());
       props.setProperty("logpath", "${datapath}/log");
