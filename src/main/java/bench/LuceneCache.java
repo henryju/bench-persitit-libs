@@ -92,11 +92,6 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
 
   @Override
   public LuceneCache<V> put(String key, V value) {
-    try {
-      writer.deleteDocuments(new Term("key", key));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
     doPut(key, value);
     return this;
   }
@@ -108,7 +103,7 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
     doc.add(new TextField("key", key, Field.Store.NO));
     doc.add(new StoredField("data", serData.toByteArray()));
     try {
-      writer.addDocument(doc);
+      writer.updateDocument(new Term("key", key), doc);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

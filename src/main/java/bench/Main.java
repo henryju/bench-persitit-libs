@@ -9,7 +9,7 @@ public class Main {
 
   private static final int DATA_SIZE = 100;
   private static final long COUNT = 1_000_000;
-  private static final long RANDOM_UPDATE_COUNT = 100_000;
+  private static final long RANDOM_UPDATE_COUNT = 10_000;
   private static List<Integer> toBeUpdate;
   private static String bigData;
 
@@ -92,7 +92,7 @@ public class Main {
         throw new RuntimeException();
       }
     }
-    System.out.println("Random update: " + (System.currentTimeMillis() - start) + "ms");
+    System.out.println(RANDOM_UPDATE_COUNT + " random updates: " + (System.currentTimeMillis() - start) + "ms");
 
     cache.close();
     System.gc();
