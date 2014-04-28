@@ -21,7 +21,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.SimpleFSDirectory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
 import org.objenesis.strategy.SerializingInstantiatorStrategy;
@@ -45,7 +45,7 @@ public class LuceneCache<V extends Serializable> implements Cache<String, V> {
     try {
       this.valueClass = valueClass;
       analyzer = new KeywordAnalyzer();
-      Directory index = new SimpleFSDirectory(new File("target/lucene"));
+      Directory index = FSDirectory.open(new File("target/lucene"));
 
       IndexWriterConfig config = new IndexWriterConfig(Version.LUCENE_47, analyzer);
       config.setOpenMode(OpenMode.CREATE);
